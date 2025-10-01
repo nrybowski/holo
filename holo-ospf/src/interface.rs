@@ -98,6 +98,8 @@ pub struct InterfaceState<V: Version> {
     pub auth: Arc<ArcSwap<Option<AuthMethod>>>,
     // Tasks.
     pub tasks: InterfaceTasks<V>,
+    // Dynamic value of the interface cost.
+    pub cost: u16,
 }
 
 #[derive(Debug)]
@@ -256,12 +258,16 @@ where
     ) -> Interface<V> {
         Debug::<V>::InterfaceCreate(&name).log();
 
+        let config = InterfaceCfg::default();
+        let mut state = InterfaceState::default();
+        state.cost = config.cost;
+
         Interface {
             id,
             name,
             system: InterfaceSys::default(),
-            config: InterfaceCfg::default(),
-            state: InterfaceState::default(),
+            config,
+            state,
             vlink_key,
         }
     }
@@ -1005,6 +1011,7 @@ where
             network_lsa_self: None,
             auth: Default::default(),
             tasks: Default::default(),
+            cost: 0,
         }
     }
 }
