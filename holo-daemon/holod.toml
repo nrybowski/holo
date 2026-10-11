@@ -49,33 +49,33 @@ state_dir = "/var/opt/holo"
   # Enable or disable the event recorder (files are saved in @state_dir)
   enabled = false
 
-# Daemon plugins
-[plugins]
-  # gRPC northbound plugin configuration
-  [plugins.grpc]
-    # Enable or disable the plugin
+# Northbound servers
+[northbound]
+  # gRPC server configuration
+  [northbound.grpc]
+    # Enable or disable the server
     enabled = true
     # gRPC server TCP listening addresses, in addition to the Unix socket
     #
     # TCP clients authenticate as users under /ietf-system:system/authentication/user
     address = []
     # TLS certificate and key, required by TCP listeners only
-    [plugins.grpc.tls]
+    [northbound.grpc.tls]
       # TLS certificate
       certificate = "/etc/holo/holo.pem"
       # TLS key
       key = "/etc/holo/holo.key"
 
-  # gNMI northbound plugin configuration
-  [plugins.gnmi]
-    # Enable or disable the plugin
+  # gNMI server configuration
+  [northbound.gnmi]
+    # Enable or disable the server
     enabled = false
     # gNMI server TCP listening addresses
     #
     # Clients authenticate as users under /ietf-system:system/authentication/user
     address = ["0.0.0.0:9339"]
     # TLS certificate and key
-    [plugins.gnmi.tls]
+    [northbound.gnmi.tls]
       # TLS certificate
       certificate = "/etc/holo/holo.pem"
       # TLS key

@@ -4,10 +4,10 @@
 // SPDX-License-Identifier: MIT
 //
 
-mod client;
 mod core;
 mod db;
 mod error;
+mod server;
 
 pub use self::core::Northbound;
 pub use self::error::{Error, Result};

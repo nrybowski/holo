@@ -21,7 +21,7 @@ use yang5::data::{Data, DataFormat, DataPrinterFlags, DataTree};
 use yang5::schema::SchemaNodeKind;
 
 use crate::config;
-use crate::northbound::client::{api, grpc};
+use crate::northbound::server::{api, grpc};
 
 const GNMI_VERSION: &str = "0.8.1";
 
@@ -54,7 +54,7 @@ impl proto::GNmi for GNmiService {
         let yang_ctx = YANG_CTX.get().unwrap();
         let grpc_request = grpc_request.into_inner();
         trace_span!("northbound").in_scope(|| {
-            trace_span!("client", name = "grpc").in_scope(|| {
+            trace_span!("server", name = "gnmi").in_scope(|| {
                 trace!(data = ?grpc_request, "received Capabilities() request");
             });
         });
@@ -95,7 +95,7 @@ impl proto::GNmi for GNmiService {
     ) -> Result<Response<proto::GetResponse>, Status> {
         let grpc_request = grpc_request.into_inner();
         trace_span!("northbound").in_scope(|| {
-            trace_span!("client", name = "gnmi").in_scope(|| {
+            trace_span!("server", name = "gnmi").in_scope(|| {
                 trace!(data = ?grpc_request, "received Get() request");
             });
         });
@@ -177,7 +177,7 @@ impl proto::GNmi for GNmiService {
         let author = grpc::request_author(&grpc_request);
         let grpc_request = grpc_request.into_inner();
         trace_span!("northbound").in_scope(|| {
-            trace_span!("client", name = "gnmi").in_scope(|| {
+            trace_span!("server", name = "gnmi").in_scope(|| {
                 trace!(data = ?grpc_request, "received Set() request");
             });
         });

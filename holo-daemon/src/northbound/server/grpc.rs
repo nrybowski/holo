@@ -34,7 +34,7 @@ use yang5::data::{
 };
 use yang5::schema::{SchemaOutputFormat, SchemaPrinterFlags};
 
-use crate::northbound::client::api;
+use crate::northbound::server::api;
 use crate::{config, northbound};
 
 mod proto {
@@ -76,7 +76,7 @@ impl proto::Northbound for NorthboundService {
         let yang_ctx = YANG_CTX.get().unwrap();
         let grpc_request = grpc_request.into_inner();
         trace_span!("northbound").in_scope(|| {
-            trace_span!("client", name = "grpc").in_scope(|| {
+            trace_span!("server", name = "grpc").in_scope(|| {
                 trace!(data = ?grpc_request, "received Capabilities() request");
             });
         });
@@ -129,7 +129,7 @@ impl proto::Northbound for NorthboundService {
     ) -> Result<Response<proto::GetSchemaResponse>, Status> {
         let grpc_request = grpc_request.into_inner();
         trace_span!("northbound").in_scope(|| {
-            trace_span!("client", name = "grpc").in_scope(|| {
+            trace_span!("server", name = "grpc").in_scope(|| {
                 trace!(data = ?grpc_request, "received GetSchema() request");
             });
         });
@@ -187,7 +187,7 @@ impl proto::Northbound for NorthboundService {
     ) -> Result<Response<proto::GetStateResponse>, Status> {
         let grpc_request = grpc_request.into_inner();
         trace_span!("northbound").in_scope(|| {
-            trace_span!("client", name = "grpc").in_scope(|| {
+            trace_span!("server", name = "grpc").in_scope(|| {
                 trace!(data = ?grpc_request, "received GetState() request");
             });
         });
@@ -229,7 +229,7 @@ impl proto::Northbound for NorthboundService {
     ) -> Result<Response<proto::GetConfigResponse>, Status> {
         let grpc_request = grpc_request.into_inner();
         trace_span!("northbound").in_scope(|| {
-            trace_span!("client", name = "grpc").in_scope(|| {
+            trace_span!("server", name = "grpc").in_scope(|| {
                 trace!(data = ?grpc_request, "received GetConfig() request");
             });
         });
@@ -271,7 +271,7 @@ impl proto::Northbound for NorthboundService {
     ) -> Result<Response<proto::ValidateResponse>, Status> {
         let grpc_request = grpc_request.into_inner();
         trace_span!("northbound").in_scope(|| {
-            trace_span!("client", name = "grpc").in_scope(|| {
+            trace_span!("server", name = "grpc").in_scope(|| {
                 trace!(data = ?grpc_request, "received Validate() request");
             });
         });
@@ -306,7 +306,7 @@ impl proto::Northbound for NorthboundService {
         let author = request_author(&grpc_request);
         let grpc_request = grpc_request.into_inner();
         trace_span!("northbound").in_scope(|| {
-            trace_span!("client", name = "grpc").in_scope(|| {
+            trace_span!("server", name = "grpc").in_scope(|| {
                 trace!(data = ?grpc_request, "received Commit() request");
             });
         });
@@ -364,7 +364,7 @@ impl proto::Northbound for NorthboundService {
     ) -> Result<Response<proto::ExecuteResponse>, Status> {
         let grpc_request = grpc_request.into_inner();
         trace_span!("northbound").in_scope(|| {
-            trace_span!("client", name = "grpc").in_scope(|| {
+            trace_span!("server", name = "grpc").in_scope(|| {
                 trace!(data = ?grpc_request, "received Execute() request");
             });
         });
@@ -409,7 +409,7 @@ impl proto::Northbound for NorthboundService {
     ) -> Result<Response<Self::ListTransactionsStream>, Status> {
         let grpc_request = grpc_request.into_inner();
         trace_span!("northbound").in_scope(|| {
-            trace_span!("client", name = "grpc").in_scope(|| {
+            trace_span!("server", name = "grpc").in_scope(|| {
                 trace!(data = ?grpc_request, "received GetTransaction() request");
             });
         });
@@ -448,7 +448,7 @@ impl proto::Northbound for NorthboundService {
     ) -> Result<Response<proto::GetTransactionResponse>, Status> {
         let grpc_request = grpc_request.into_inner();
         trace_span!("northbound").in_scope(|| {
-            trace_span!("client", name = "grpc").in_scope(|| {
+            trace_span!("server", name = "grpc").in_scope(|| {
                 trace!(data = ?grpc_request, "received Execute() request");
             });
         });
@@ -489,7 +489,7 @@ impl proto::Northbound for NorthboundService {
     ) -> Result<Response<Self::SubscribeStream>, Status> {
         let grpc_request = grpc_request.into_inner();
         trace_span!("northbound").in_scope(|| {
-            trace_span!("client", name = "grpc").in_scope(|| {
+            trace_span!("server", name = "grpc").in_scope(|| {
                 trace!(data = ?grpc_request, "received Subscribe() request");
             });
         });

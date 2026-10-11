@@ -54,7 +54,7 @@ Alternatively, you can use `cargo install` to install these binaries into the `$
 ## Configuration
 
 `holod` configuration consists of the following:
-* `/etc/holod.toml`: static configuration that can't change once the daemon starts. It's meant to configure which features are enabled, plugins parameters, among other things.
+* `/etc/holod.toml`: static configuration that can't change once the daemon starts. It's meant to configure which features are enabled, northbound server parameters, among other things.
   Here's an [example](holo-daemon/holod.toml) containing the default values. If this file doesn't exist, the default values will be used.
 * Running configuration: this is the normal YANG-modeled
 configuration that can only be changed through a northbound client
@@ -64,11 +64,11 @@ configuration that can only be changed through a northbound client
 
 ### Remote access (optional)
 
-By default, the gRPC plugin listens on a local Unix socket and the gNMI plugin is disabled.
+By default, the gRPC server listens on a local Unix socket and the gNMI server is disabled.
 Access to the socket is granted by its file permissions, and no password is required.
 
-When a plugin listens on a TCP address, clients must authenticate as a user configured under `/ietf-system:system/authentication/user`, providing its name and password with every request.
-Both plugins always require TLS on a TCP address, since those credentials would otherwise be transmitted in clear text.
+When a server listens on a TCP address, clients must authenticate as a user configured under `/ietf-system:system/authentication/user`, providing its name and password with every request.
+Both servers always require TLS on a TCP address, since those credentials would otherwise be transmitted in clear text.
 The remainder of this section describes how to provision the required certificate and key.
 
 Create a certificate authority for the network:
@@ -94,7 +94,7 @@ The `subjectAltName` must include the address or name that clients connect to, o
 # install -m 0444 holo.pem /etc/holo/holo.pem
 ```
 
-Enable the desired plugin in `/etc/holod.toml`, and verify its TCP listening address and certificate paths.
+Enable the desired server in `/etc/holod.toml`, and verify its TCP listening address and certificate paths.
 Clients require `ca.pem` to validate the router certificate, along with the name and password of a configured user.
 
 #### Validating the setup with gnmic

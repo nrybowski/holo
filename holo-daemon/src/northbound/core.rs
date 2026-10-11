@@ -34,7 +34,7 @@ use yang5::data::{
 };
 
 use crate::config::Config;
-use crate::northbound::client::{api as capi, gnmi, grpc};
+use crate::northbound::server::{api as capi, gnmi, grpc};
 use crate::northbound::{Error, Result, db};
 
 pub struct Northbound {
@@ -46,8 +46,8 @@ pub struct Northbound {
     validation_fns: Vec<ValidateFn>,
     // Maps each configuration node to the index of its data provider.
     provider_paths: HashMap<String, usize>,
-    // List of management interfaces.
-    clients: Vec<Task<()>>,
+    // List of northbound servers.
+    servers: Vec<Task<()>>,
     // List of data providers.
     providers: Vec<NbDaemonSender>,
     // Channel used to receive messages from the external clients.
@@ -128,8 +128,8 @@ impl Northbound {
         // Track the local users the northbound clients authenticate against.
         let users = start_users_watch(&ibus_tx);
 
-        // Start client tasks (e.g. gRPC, gNMI).
-        let (rx_clients, clients) = start_clients(config, users);
+        // Start the northbound servers (e.g. gRPC, gNMI).
+        let (rx_clients, servers) = start_servers(config, users);
 
         // Resolve the data provider that owns each configuration node.
         let provider_paths = resolve_provider_paths(&registered_paths);
@@ -139,7 +139,7 @@ impl Northbound {
             db,
             validation_fns,
             provider_paths,
-            clients,
+            servers,
             providers,
             rx_clients,
             rx_providers,
@@ -168,7 +168,7 @@ impl Northbound {
                 }
                 _ = signal_rx.recv() => {
                     self.rx_clients.close();
-                    self.clients.clear();
+                    self.servers.clear();
                     self.providers.clear();
                 },
                 else => break,
@@ -768,18 +768,18 @@ fn start_providers(
     (provider_rx, providers, registered_paths, validation_fns)
 }
 
-// Starts external clients.
-fn start_clients(
+// Starts the northbound servers.
+fn start_servers(
     config: &Config,
     users: watch::Receiver<Users>,
 ) -> (Receiver<capi::client::Request>, Vec<Task<()>>) {
-    let mut clients = Vec::new();
+    let mut servers = Vec::new();
     let (client_tx, daemon_rx) = mpsc::channel(4);
 
     // Spawn gRPC task.
-    let grpc_config = &config.plugins.grpc;
+    let grpc_config = &config.northbound.grpc;
     if grpc_config.enabled {
-        clients.extend(grpc::start(
+        servers.extend(grpc::start(
             grpc_config,
             config.state_path(Config::GRPC_SOCKET_NAME),
             client_tx.clone(),
@@ -788,16 +788,16 @@ fn start_clients(
     }
 
     // Spawn gNMI task.
-    let gnmi_config = &config.plugins.gnmi;
+    let gnmi_config = &config.northbound.gnmi;
     if gnmi_config.enabled {
-        clients.extend(gnmi::start(gnmi_config, client_tx, users));
+        servers.extend(gnmi::start(gnmi_config, client_tx, users));
     }
 
-    (daemon_rx, clients)
+    (daemon_rx, servers)
 }
 
 // Mirrors the local users, which holo-system publishes over the internal bus,
-// so that the northbound plugins can authenticate incoming requests.
+// so that the northbound servers can authenticate incoming requests.
 fn start_users_watch(ibus_tx: &ibus::IbusChannelsTx) -> watch::Receiver<Users> {
     let (users_tx, users_rx) = watch::channel(Users::default());
     let (notif_tx, mut notif_rx) = mpsc::unbounded_channel();

@@ -19,7 +19,7 @@ pub struct Config {
     pub state_dir: PathBuf,
     pub logging: Logging,
     pub event_recorder: EventRecorder,
-    pub plugins: Plugins,
+    pub northbound: Northbound,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -90,7 +90,7 @@ pub struct EventRecorder {
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct Plugins {
+pub struct Northbound {
     pub grpc: Grpc,
     pub gnmi: Gnmi,
 }
@@ -165,7 +165,7 @@ impl Default for Config {
             state_dir: PathBuf::from("/var/opt/holo"),
             logging: Default::default(),
             event_recorder: Default::default(),
-            plugins: Default::default(),
+            northbound: Default::default(),
         }
     }
 }
