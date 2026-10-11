@@ -5,8 +5,9 @@
 //
 
 use std::error::Error as _;
+use std::fs::Permissions;
 use std::net::SocketAddr;
-use std::os::fd::AsFd;
+use std::os::unix::fs::PermissionsExt;
 use std::path::{Path as FsPath, PathBuf};
 use std::pin::Pin;
 use std::time::SystemTime;
@@ -16,7 +17,6 @@ use holo_northbound::{Path, PathElem};
 use holo_utils::auth::Users;
 use holo_utils::task::Task;
 use holo_yang::{YANG_CTX, YANG_FEATURES};
-use nix::sys::stat::{Mode, fchmod};
 use nix::unistd::{Uid, User};
 use tokio::net::UnixListener;
 use tokio::sync::mpsc::Sender;
@@ -817,8 +817,10 @@ fn unix_listener(path: &FsPath) -> std::io::Result<UnixListenerStream> {
     }
 
     let listener = UnixListener::bind(path)?;
-    // Add the write access left out by the umask.
-    fchmod(listener.as_fd(), Mode::from_bits_truncate(0o660))?;
+    // Add the write access left out by the umask. This has to go through the
+    // path, as changing the mode of the socket's descriptor leaves the file
+    // untouched.
+    std::fs::set_permissions(path, Permissions::from_mode(0o660))?;
 
     Ok(UnixListenerStream::new(listener))
 }
