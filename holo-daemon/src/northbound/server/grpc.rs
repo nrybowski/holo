@@ -27,7 +27,7 @@ use tonic::service::interceptor::InterceptedService;
 use tonic::transport::server::{Router, UdsConnectInfo};
 use tonic::transport::{Identity, Server, ServerTlsConfig};
 use tonic::{Request, Response, Status};
-use tracing::{trace, trace_span};
+use tracing::{trace, trace_span, warn};
 use yang5::data::{
     Data, DataDiff, DataFormat, DataOperation, DataParserFlags,
     DataPrinterFlags, DataTree, DataValidationFlags,
@@ -52,6 +52,7 @@ struct NorthboundService {
 pub(crate) struct Authenticator {
     users: watch::Receiver<Users>,
     unix: bool,
+    insecure: bool,
 }
 
 // User name a request was authenticated with.
@@ -532,10 +533,15 @@ impl Authenticator {
     pub(crate) fn new(
         users: watch::Receiver<Users>,
         listener: &Listener,
+        insecure: bool,
     ) -> Authenticator {
         let unix = matches!(listener, Listener::Unix(_));
 
-        Authenticator { users, unix }
+        Authenticator {
+            users,
+            unix,
+            insecure,
+        }
     }
 
     // Rejects the request unless it carries the credentials of a configured
@@ -559,6 +565,11 @@ impl Authenticator {
         // the peer's identity comes from the kernel, so no password is asked
         // for.
         if self.unix {
+            return Ok(None);
+        }
+
+        // In insecure mode, anyone who can reach the address is let in.
+        if self.insecure {
             return Ok(None);
         }
 
@@ -864,14 +875,23 @@ pub(crate) fn request_author<T>(request: &Request<T>) -> String {
 // Sets up the server for the given listener.
 //
 // A Unix socket is protected by its file permissions. A TCP address requires
-// TLS, as credentials would otherwise cross the network in the clear.
+// TLS, as credentials would otherwise cross the network in the clear, unless
+// the server runs in insecure mode, where no credentials are asked for.
 pub(crate) fn server_init(
     name: &str,
     listener: &Listener,
     tls: &config::Tls,
+    insecure: bool,
 ) -> Server {
     let server = Server::builder();
     match listener {
+        Listener::Tcp(address) if insecure => {
+            warn!(
+                %address,
+                "{name} server in insecure mode, without TLS or authentication"
+            );
+            server
+        }
         Listener::Tcp(_) => {
             let cert = read_pem(&tls.certificate, "TLS certificate");
             let key = read_pem(&tls.key, "TLS key");
@@ -932,8 +952,10 @@ pub(crate) fn start(
     std::iter::once(Listener::Unix(socket_path))
         .chain(tcp_listeners)
         .map(|listener| {
-            let mut server = server_init("gRPC", &listener, &config.tls);
-            let auth = Authenticator::new(users.clone(), &listener);
+            let mut server =
+                server_init("gRPC", &listener, &config.tls, config.insecure);
+            let auth =
+                Authenticator::new(users.clone(), &listener, config.insecure);
             let service = NorthboundService {
                 request_tx: request_tx.clone(),
             };

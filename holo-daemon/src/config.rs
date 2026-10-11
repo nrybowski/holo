@@ -100,6 +100,7 @@ pub struct Northbound {
 pub struct Grpc {
     pub enabled: bool,
     pub address: Vec<SocketAddr>,
+    pub insecure: bool,
     pub tls: Tls,
 }
 
@@ -108,6 +109,7 @@ pub struct Grpc {
 pub struct Gnmi {
     pub enabled: bool,
     pub address: Vec<SocketAddr>,
+    pub insecure: bool,
     pub tls: Tls,
 }
 
@@ -243,6 +245,7 @@ impl Default for Grpc {
         Grpc {
             enabled: true,
             address: vec![],
+            insecure: false,
             tls: Default::default(),
         }
     }
@@ -255,6 +258,7 @@ impl Default for Gnmi {
         Gnmi {
             enabled: false,
             address: vec![SocketAddr::from((Ipv4Addr::UNSPECIFIED, 9339))],
+            insecure: false,
             tls: Default::default(),
         }
     }

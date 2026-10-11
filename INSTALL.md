@@ -68,7 +68,8 @@ By default, the gRPC server listens on a local Unix socket and the gNMI server i
 Access to the socket is granted by its file permissions, and no password is required.
 
 When a server listens on a TCP address, clients must authenticate as a user configured under `/ietf-system:system/authentication/user`, providing its name and password with every request.
-Both servers always require TLS on a TCP address, since those credentials would otherwise be transmitted in clear text.
+Both servers require TLS on a TCP address, since those credentials would otherwise be transmitted in clear text.
+For labs and testing, a server's `insecure` option serves its TCP addresses without TLS or authentication instead, giving anyone who can reach them full administrative access.
 The remainder of this section describes how to provision the required certificate and key.
 
 Create a certificate authority for the network:
