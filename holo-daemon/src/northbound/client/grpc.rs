@@ -859,29 +859,17 @@ pub(crate) fn request_author<T>(request: &Request<T>) -> String {
     }
 }
 
-// Sets up the listener and the server for the given address.
+// Sets up the server for the given listener.
 //
-// An address starting with a slash is taken as the path of a Unix socket,
-// which is protected by its file permissions. A TCP address requires TLS, as
-// credentials would otherwise cross the network in the clear.
+// A Unix socket is protected by its file permissions. A TCP address requires
+// TLS, as credentials would otherwise cross the network in the clear.
 pub(crate) fn server_init(
     name: &str,
-    address: &str,
+    listener: &Listener,
     tls: &config::Tls,
-) -> (Listener, Server) {
-    let listener = match address.starts_with('/') {
-        true => Listener::Unix(PathBuf::from(address)),
-        false => match address.parse::<SocketAddr>() {
-            Ok(address) => Listener::Tcp(address),
-            Err(error) => {
-                eprintln!("failed to parse the {name} server address: {error}");
-                std::process::exit(1);
-            }
-        },
-    };
-
+) -> Server {
     let server = Server::builder();
-    let server = match &listener {
+    match listener {
         Listener::Tcp(_) => {
             let cert = read_pem(&tls.certificate, "TLS certificate");
             let key = read_pem(&tls.key, "TLS key");
@@ -896,9 +884,7 @@ pub(crate) fn server_init(
             }
         }
         Listener::Unix(_) => server,
-    };
-
-    (listener, server)
+    }
 }
 
 // Binds the listener and serves requests, terminating the daemon on failure.
@@ -935,15 +921,16 @@ pub(crate) async fn serve(name: &str, listener: Listener, router: Router) {
 
 pub(crate) fn start(
     config: &config::Grpc,
+    socket_path: PathBuf,
     request_tx: Sender<api::client::Request>,
     users: watch::Receiver<Users>,
 ) -> Vec<Task<()>> {
-    config
-        .address
-        .iter()
-        .map(|address| {
-            let (listener, mut server) =
-                server_init("gRPC", address, &config.tls);
+    // The Unix socket is always served, in addition to any TCP address.
+    let tcp_listeners = config.address.iter().copied().map(Listener::Tcp);
+    std::iter::once(Listener::Unix(socket_path))
+        .chain(tcp_listeners)
+        .map(|listener| {
+            let mut server = server_init("gRPC", &listener, &config.tls);
             let auth = Authenticator::new(users.clone(), &listener);
             let service = NorthboundService {
                 request_tx: request_tx.clone(),

@@ -686,7 +686,10 @@ fn start_providers(
     let (provider_tx, provider_rx) = mpsc::unbounded_channel();
     let shared = InstanceShared {
         db: Some(db),
-        event_recorder_config: Some(config.event_recorder.clone()),
+        event_recorder_dir: config
+            .event_recorder
+            .enabled
+            .then(|| config.state_dir.clone()),
         ..Default::default()
     };
 
@@ -778,6 +781,7 @@ fn start_clients(
     if grpc_config.enabled {
         clients.extend(grpc::start(
             grpc_config,
+            config.state_path(Config::GRPC_SOCKET_NAME),
             client_tx.clone(),
             users.clone(),
         ));

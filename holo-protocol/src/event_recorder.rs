@@ -7,21 +7,14 @@
 #![cfg_attr(feature = "testing", allow(dead_code, unused_variables))]
 
 use std::io::Write;
+use std::path::Path;
 
 use holo_utils::protocol::Protocol;
-use serde::Deserialize;
 use tracing::warn;
 
 use crate::{InstanceMsg, ProtocolInstance};
 
 pub struct EventRecorder(std::fs::File);
-
-#[derive(Clone, Debug, Deserialize)]
-#[serde(default, deny_unknown_fields)]
-pub struct Config {
-    pub enabled: bool,
-    pub dir: String,
-}
 
 // ===== impl EventRecorder =====
 
@@ -30,13 +23,10 @@ impl EventRecorder {
     pub(crate) fn new(
         protocol: Protocol,
         instance: &str,
-        config: Config,
+        dir: &Path,
     ) -> Option<EventRecorder> {
         // Get full file path.
-        let path = format!(
-            "{}/holo-events-{}-{}.jsonl",
-            config.dir, protocol, instance
-        );
+        let path = dir.join(format!("holo-events-{protocol}-{instance}.jsonl"));
 
         // Create event recorder.
         match std::fs::OpenOptions::new()
@@ -61,17 +51,6 @@ impl EventRecorder {
         let event = serde_json::to_string(msg).unwrap();
         if let Err(error) = writeln!(self.0, "{event}") {
             warn!(%error, "couldn't write to file");
-        }
-    }
-}
-
-// ===== impl Config =====
-
-impl Default for Config {
-    fn default() -> Config {
-        Config {
-            enabled: false,
-            dir: "/var/opt/holo".to_owned(),
         }
     }
 }

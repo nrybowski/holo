@@ -6,7 +6,9 @@
 
 #![allow(clippy::derivable_impls)]
 
-use holo_protocol::event_recorder;
+use std::net::{Ipv4Addr, SocketAddr};
+use std::path::PathBuf;
+
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -14,9 +16,9 @@ use serde::Deserialize;
 pub struct Config {
     pub user: String,
     pub group: String,
-    pub database_path: String,
+    pub state_dir: PathBuf,
     pub logging: Logging,
-    pub event_recorder: event_recorder::Config,
+    pub event_recorder: EventRecorder,
     pub plugins: Plugins,
 }
 
@@ -80,6 +82,12 @@ pub enum LoggingFmtStyle {
     Pretty,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct EventRecorder {
+    pub enabled: bool,
+}
+
 #[derive(Debug, Default, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Plugins {
@@ -91,7 +99,7 @@ pub struct Plugins {
 #[serde(default, deny_unknown_fields)]
 pub struct Grpc {
     pub enabled: bool,
-    pub address: Vec<String>,
+    pub address: Vec<SocketAddr>,
     pub tls: Tls,
 }
 
@@ -99,7 +107,7 @@ pub struct Grpc {
 #[serde(default, deny_unknown_fields)]
 pub struct Gnmi {
     pub enabled: bool,
-    pub address: Vec<String>,
+    pub address: Vec<SocketAddr>,
     pub tls: Tls,
 }
 
@@ -115,10 +123,15 @@ pub struct Tls {
 impl Config {
     const DFLT_FILEPATH: &'static str = "/etc/holod.toml";
 
+    // Files kept in the state directory.
+    pub(crate) const DATABASE_NAME: &'static str = "holo.db";
+    pub(crate) const GRPC_SOCKET_NAME: &'static str = "holod.sock";
+    pub(crate) const INSTANCE_LOCK_NAME: &'static str = "holod.lock";
+
     pub(crate) fn load(config_file: Option<&str>) -> Config {
         let config_file = config_file.unwrap_or(Config::DFLT_FILEPATH);
 
-        match std::fs::read_to_string(config_file) {
+        let config = match std::fs::read_to_string(config_file) {
             Ok(config_str) => toml::from_str(&config_str)
                 .expect("Failed to parse configuration file"),
             Err(err) => {
@@ -126,7 +139,19 @@ impl Config {
                 eprintln!("Falling back to default configuration...");
                 Config::default()
             }
+        };
+
+        if !config.state_dir.is_absolute() {
+            eprintln!("state_dir must be an absolute path");
+            std::process::exit(1);
         }
+
+        config
+    }
+
+    // Returns the path of the given file in the state directory.
+    pub(crate) fn state_path(&self, name: &str) -> PathBuf {
+        self.state_dir.join(name)
     }
 }
 
@@ -137,7 +162,7 @@ impl Default for Config {
         Config {
             user: "holo".to_owned(),
             group: "holoadm".to_owned(),
-            database_path: "/var/opt/holo/holo.db".to_owned(),
+            state_dir: PathBuf::from("/var/opt/holo"),
             logging: Default::default(),
             event_recorder: Default::default(),
             plugins: Default::default(),
@@ -191,13 +216,21 @@ impl Default for LoggingFmt {
     }
 }
 
+// ===== impl EventRecorder =====
+
+impl Default for EventRecorder {
+    fn default() -> EventRecorder {
+        EventRecorder { enabled: false }
+    }
+}
+
 // ===== impl Grpc =====
 
 impl Default for Grpc {
     fn default() -> Grpc {
         Grpc {
             enabled: true,
-            address: vec!["/var/opt/holo/holod.sock".to_owned()],
+            address: vec![],
             tls: Default::default(),
         }
     }
@@ -209,7 +242,7 @@ impl Default for Gnmi {
     fn default() -> Gnmi {
         Gnmi {
             enabled: false,
-            address: vec!["0.0.0.0:9339".to_owned()],
+            address: vec![SocketAddr::from((Ipv4Addr::UNSPECIFIED, 9339))],
             tls: Default::default(),
         }
     }

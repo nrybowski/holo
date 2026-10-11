@@ -30,9 +30,6 @@ use tracing_subscriber::prelude::*;
 #[global_allocator]
 static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-// Path for the exclusive flock(2) used to prevent concurrent instances.
-const INSTANCE_LOCK_PATH: &str = "/var/opt/holo/holod.lock";
-
 #[derive(Debug, Default)]
 struct Args {
     config_file: Option<String>,
@@ -71,16 +68,17 @@ fn parse_args() -> Result<Args, lexopt::Error> {
     Ok(args)
 }
 
-fn ensure_single_instance() -> Flock<std::fs::File> {
+fn ensure_single_instance(path: &Path) -> Flock<std::fs::File> {
     let file = std::fs::OpenOptions::new()
         .read(true)
         .write(true)
         .create(true)
         .truncate(false)
-        .open(INSTANCE_LOCK_PATH)
+        .open(path)
         .unwrap_or_else(|err| {
             eprintln!(
-                "failed to open instance lock file {INSTANCE_LOCK_PATH}: {err}"
+                "failed to open instance lock file {}: {err}",
+                path.display()
             );
             std::process::exit(1);
         });
@@ -92,7 +90,8 @@ fn ensure_single_instance() -> Flock<std::fs::File> {
                 eprintln!("another instance of holod is already running");
             } else {
                 eprintln!(
-                    "failed to acquire instance lock on {INSTANCE_LOCK_PATH}: {errno}"
+                    "failed to acquire instance lock on {}: {errno}",
+                    path.display()
                 );
             }
             std::process::exit(1);
@@ -307,7 +306,8 @@ fn main() {
     umask(Mode::from_bits_truncate(0o027));
 
     // Ensure only one holod instance runs.
-    let _lock = ensure_single_instance();
+    let _lock =
+        ensure_single_instance(&config.state_path(Config::INSTANCE_LOCK_NAME));
 
     // Drop privileges.
     if let Err(error) = privdrop(&config.user, &config.group) {
@@ -319,7 +319,7 @@ fn main() {
     init_tracing(&config.logging);
 
     // Initialize non-volatile storage.
-    let db = init_db(&config.database_path)
+    let db = init_db(config.state_path(Config::DATABASE_NAME))
         .expect("failed to initialize non-volatile storage");
 
     // We're ready to go!

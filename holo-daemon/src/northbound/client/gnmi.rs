@@ -517,8 +517,8 @@ pub(crate) fn start(
         .address
         .iter()
         .map(|address| {
-            let (listener, mut server) =
-                grpc::server_init("gNMI", address, &config.tls);
+            let listener = grpc::Listener::Tcp(*address);
+            let mut server = grpc::server_init("gNMI", &listener, &config.tls);
             let auth = grpc::Authenticator::new(users.clone(), &listener);
             let service = GNmiService {
                 request_tx: request_tx.clone(),

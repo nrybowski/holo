@@ -10,6 +10,7 @@ pub mod test;
 
 #[cfg(not(feature = "testing"))]
 use std::panic::AssertUnwindSafe;
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use derive_new::new;
@@ -106,8 +107,8 @@ pub struct InstanceShared {
     pub sr_config: Arc<SrCfg>,
     // Global BIER configuration.
     pub bier_config: Arc<BierCfg>,
-    // Event recorder configuration.
-    pub event_recorder_config: Option<event_recorder::Config>,
+    // Event recorder directory, if event recording is enabled.
+    pub event_recorder_dir: Option<PathBuf>,
 }
 
 /// Instance input message.
@@ -345,10 +346,9 @@ async fn run<P>(
 
     // Get event recorder.
     let event_record = shared
-        .event_recorder_config
-        .clone()
-        .filter(|config| config.enabled)
-        .and_then(|config| EventRecorder::new(P::PROTOCOL, &name, config));
+        .event_recorder_dir
+        .as_deref()
+        .and_then(|dir| EventRecorder::new(P::PROTOCOL, &name, dir));
 
     // Create protocol instance.
     let mut instance = P::new(name, shared, instance_channels_tx);

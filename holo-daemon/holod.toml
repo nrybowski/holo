@@ -2,11 +2,8 @@
 user = "holo"
 group = "holoadm"
 
-# Path to the non-volatile memory storage for configuration transactions,
-# graceful-restart information, authentication sequence numbers, and more.
-#
-# Needs to be writable by @user or @group.
-database_path = "/var/opt/holo/holo.db"
+# Directory for runtime and persistent state (needs to be writable by @user or @group)
+state_dir = "/var/opt/holo"
 
 # Logging configuration
 [logging]
@@ -49,10 +46,8 @@ database_path = "/var/opt/holo/holo.db"
 
 # Event recorder (useful for bug reporting)
 [event_recorder]
-  # Enable or disable the event recorder
+  # Enable or disable the event recorder (files are saved in @state_dir)
   enabled = false
-  # Directory where to save the files (needs to be writable by @user or @group)
-  dir = "/var/opt/holo"
 
 # Daemon plugins
 [plugins]
@@ -60,10 +55,10 @@ database_path = "/var/opt/holo/holo.db"
   [plugins.grpc]
     # Enable or disable the plugin
     enabled = true
-    # gRPC server listening addresses (a leading slash means a Unix socket)
+    # gRPC server TCP listening addresses, in addition to the Unix socket
     #
     # TCP clients authenticate as users under /ietf-system:system/authentication/user
-    address = ["/var/opt/holo/holod.sock"]
+    address = []
     # TLS certificate and key, required by TCP listeners only
     [plugins.grpc.tls]
       # TLS certificate
@@ -75,11 +70,11 @@ database_path = "/var/opt/holo/holo.db"
   [plugins.gnmi]
     # Enable or disable the plugin
     enabled = false
-    # gNMI server listening addresses (a leading slash means a Unix socket)
+    # gNMI server TCP listening addresses
     #
-    # TCP clients authenticate as users under /ietf-system:system/authentication/user
+    # Clients authenticate as users under /ietf-system:system/authentication/user
     address = ["0.0.0.0:9339"]
-    # TLS certificate and key, required by TCP listeners only
+    # TLS certificate and key
     [plugins.gnmi.tls]
       # TLS certificate
       certificate = "/etc/holo/holo.pem"
