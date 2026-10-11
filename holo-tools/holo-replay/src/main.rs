@@ -6,13 +6,57 @@
 
 use std::str::FromStr;
 
-use clap::{App, Arg};
 use holo_ospf::version::{Ospfv2, Ospfv3};
 use holo_protocol::ProtocolInstance;
 use holo_protocol::test::setup;
 use holo_protocol::test::stub::start_test_instance;
 use holo_rip::version::{Ripng, Ripv2};
 use holo_utils::protocol::Protocol;
+
+#[derive(Debug)]
+struct Args {
+    protocol: String,
+    filename: String,
+}
+
+// Usage summary printed by --help and on command-line errors.
+const USAGE: &str = "\
+Usage: replay --protocol <PROTOCOL> <FILENAME>
+
+Replay events from a record file.
+
+Arguments:
+  <FILENAME>  Events file path
+
+Options:
+      --protocol <PROTOCOL>  Protocol name (e.g. BGP, OSPFv2)
+  -h, --help                 Print this help message and exit";
+
+fn parse_args() -> Result<Args, lexopt::Error> {
+    let mut protocol = None;
+    let mut filename = None;
+    let mut parser = lexopt::Parser::from_env();
+    while let Some(arg) = parser.next()? {
+        match arg {
+            lexopt::Arg::Long("protocol") => {
+                protocol = Some(parser.value()?.into_string()?);
+            }
+            lexopt::Arg::Value(value) if filename.is_none() => {
+                filename = Some(value.into_string()?);
+            }
+            lexopt::Arg::Short('h') | lexopt::Arg::Long("help") => {
+                println!("{USAGE}");
+                std::process::exit(0);
+            }
+            _ => return Err(arg.unexpected()),
+        }
+    }
+
+    Ok(Args {
+        protocol: protocol.ok_or("missing option '--protocol'")?,
+        filename: filename.ok_or("missing argument <FILENAME>")?,
+    })
+}
 
 async fn replay<P: ProtocolInstance>(filename: &str) {
     // Spawn protocol instance.
@@ -35,25 +79,13 @@ async fn replay<P: ProtocolInstance>(filename: &str) {
 #[tokio::main(flavor = "current_thread")]
 async fn main() {
     // Parse command-line parameters.
-    let matches = App::new("Replay events")
-        .about("Replay events from a record file")
-        .arg(
-            Arg::with_name("PROTOCOL")
-                .long("protocol")
-                .help("Protocol name (e.g. BGP, OSPFv2)")
-                .value_name("PROTOCOL")
-                .required(true),
-        )
-        .arg(
-            Arg::with_name("FILENAME")
-                .help("Events file path")
-                .required(true)
-                .index(1),
-        )
-        .get_matches();
-    let protocol = matches.value_of("PROTOCOL").unwrap();
-    let protocol = Protocol::from_str(protocol).expect("Unknown protocol");
-    let filename = matches.value_of("FILENAME").unwrap();
+    let args = parse_args().unwrap_or_else(|error| {
+        eprintln!("{error}\n\n{USAGE}");
+        std::process::exit(1);
+    });
+    let protocol =
+        Protocol::from_str(&args.protocol).expect("Unknown protocol");
+    let filename = args.filename.as_str();
 
     // Setup test environment.
     setup();

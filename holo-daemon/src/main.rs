@@ -10,7 +10,6 @@ mod northbound;
 use std::path::Path;
 
 use capctl::caps;
-use clap::{App, Arg};
 use config::{Config, LoggingFileRotation, LoggingFmtStyle};
 use nix::fcntl::{Flock, FlockArg};
 use nix::sys::stat::{Mode, umask};
@@ -33,6 +32,44 @@ static ALLOC: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 // Path for the exclusive flock(2) used to prevent concurrent instances.
 const INSTANCE_LOCK_PATH: &str = "/var/opt/holo/holod.lock";
+
+#[derive(Debug, Default)]
+struct Args {
+    config_file: Option<String>,
+}
+
+// Usage summary printed by --help and on command-line errors.
+const USAGE: &str = "\
+Usage: holod [-c <file>]
+       holod -h | -V
+
+Options:
+  -c, --config <file>  Specify an alternative configuration file.
+  -h, --help           Print this help message and exit.
+  -V, --version        Print the version and exit.";
+
+fn parse_args() -> Result<Args, lexopt::Error> {
+    let mut args = Args::default();
+    let mut parser = lexopt::Parser::from_env();
+    while let Some(arg) = parser.next()? {
+        match arg {
+            lexopt::Arg::Short('c') | lexopt::Arg::Long("config") => {
+                args.config_file = Some(parser.value()?.into_string()?);
+            }
+            lexopt::Arg::Short('h') | lexopt::Arg::Long("help") => {
+                println!("{USAGE}");
+                std::process::exit(0);
+            }
+            lexopt::Arg::Short('V') | lexopt::Arg::Long("version") => {
+                println!("Holo routing daemon {}", build_version());
+                std::process::exit(0);
+            }
+            _ => return Err(arg.unexpected()),
+        }
+    }
+
+    Ok(args)
+}
 
 fn ensure_single_instance() -> Flock<std::fs::File> {
     let file = std::fs::OpenOptions::new()
@@ -252,20 +289,13 @@ fn build_version() -> String {
 
 fn main() {
     // Parse command-line parameters.
-    let matches = App::new("Holo routing daemon")
-        .version(build_version().as_str())
-        .arg(
-            Arg::with_name("config")
-                .short("c")
-                .long("config")
-                .value_name("file")
-                .help("Specify an alternative configuration file."),
-        )
-        .get_matches();
+    let args = parse_args().unwrap_or_else(|error| {
+        eprintln!("{error}\n\n{USAGE}");
+        std::process::exit(1);
+    });
 
     // Read configuration file.
-    let config_file = matches.value_of("config");
-    let config = Config::load(config_file);
+    let config = Config::load(args.config_file.as_deref());
 
     // Check for root privileges.
     if !Uid::effective().is_root() {

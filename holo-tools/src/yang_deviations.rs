@@ -4,10 +4,42 @@
 // SPDX-License-Identifier: MIT
 //
 
-use clap::{App, Arg};
 use holo_yang as yang;
 use yang5::context::ContextFlags;
 use yang5::schema::SchemaNode;
+
+// Usage summary printed by --help and on command-line errors.
+const USAGE: &str = "\
+Usage: yang_deviations <MODULE>
+
+Parses a YANG module and generate a \"not-supported\" deviation for all of
+its nodes.
+
+Arguments:
+  <MODULE>  YANG module name
+
+Options:
+  -h, --help  Print this help message and exit";
+
+// Parse the command line, returning the YANG module name.
+fn parse_args() -> Result<String, lexopt::Error> {
+    let mut module_name = None;
+    let mut parser = lexopt::Parser::from_env();
+    while let Some(arg) = parser.next()? {
+        match arg {
+            lexopt::Arg::Value(value) if module_name.is_none() => {
+                module_name = Some(value.into_string()?);
+            }
+            lexopt::Arg::Short('h') | lexopt::Arg::Long("help") => {
+                println!("{USAGE}");
+                std::process::exit(0);
+            }
+            _ => return Err(arg.unexpected()),
+        }
+    }
+
+    Ok(module_name.ok_or("missing argument <MODULE>")?)
+}
 
 // Generate fully-prefixed schema path.
 fn gen_fully_prefixed_path(snode: &SchemaNode<'_>) -> String {
@@ -28,20 +60,10 @@ fn gen_fully_prefixed_path(snode: &SchemaNode<'_>) -> String {
 
 fn main() {
     // Parse command-line parameters.
-    let matches = App::new("Generate YANG deviations")
-        .about(
-            "Parses a YANG module and generate a \"not-supported\" deviation \
-             for all of its nodes",
-        )
-        .arg(
-            Arg::with_name("MODULE")
-                .help("YANG module name")
-                .required(true)
-                .index(1),
-        )
-        .get_matches();
-
-    let module_name = matches.value_of("MODULE").unwrap();
+    let module_name = parse_args().unwrap_or_else(|error| {
+        eprintln!("{error}\n\n{USAGE}");
+        std::process::exit(1);
+    });
 
     // Initialize YANG context.
     let mut yang_ctx = yang::new_context();
@@ -52,9 +74,9 @@ fn main() {
     yang::load_module(&mut yang_ctx, "iana-bgp-types");
 
     // Load requested YANG module.
-    yang::load_module(&mut yang_ctx, module_name);
+    yang::load_module(&mut yang_ctx, &module_name);
     let module = yang_ctx
-        .get_module_latest(module_name)
+        .get_module_latest(&module_name)
         .expect("Failed to find loaded module");
 
     // Header.

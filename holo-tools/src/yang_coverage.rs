@@ -6,7 +6,6 @@
 
 use std::collections::BTreeMap;
 
-use clap::{App, Arg};
 use holo_yang as yang;
 use num_traits::cast::AsPrimitive;
 use yang5::context::Context;
@@ -23,6 +22,21 @@ struct NodeCounters<T> {
 
 #[derive(Debug, Default)]
 struct Coverage(f64);
+
+#[derive(Debug, Default)]
+struct Args {
+    modules: Vec<String>,
+    diff: Option<String>,
+}
+
+// Usage summary printed by --help and on command-line errors.
+const USAGE: &str = "\
+Usage: yang_coverage [-m <MODULE_NAME>]... [--diff <MODULE_NAME>]
+
+Options:
+  -m, --module <MODULE_NAME>  YANG module name
+      --diff <MODULE_NAME>    Generate a YANG tree diff
+  -h, --help                  Print this help message and exit";
 
 // ===== impl Coverage =====
 
@@ -51,14 +65,33 @@ impl std::fmt::Display for Coverage {
 
 // ===== helper functions =====
 
-fn load_deviation_modules(
-    yang_ctx: &mut Context,
-    matches: &clap::ArgMatches<'_>,
-) {
-    if let Some(modules) = matches.values_of("module") {
-        for module_name in modules.rev() {
-            yang::load_deviations(yang_ctx, module_name);
+fn parse_args() -> Result<Args, lexopt::Error> {
+    let mut args = Args::default();
+    let mut parser = lexopt::Parser::from_env();
+    while let Some(arg) = parser.next()? {
+        match arg {
+            lexopt::Arg::Short('m') | lexopt::Arg::Long("module") => {
+                for value in parser.values()? {
+                    args.modules.push(value.into_string()?);
+                }
+            }
+            lexopt::Arg::Long("diff") => {
+                args.diff = Some(parser.value()?.into_string()?);
+            }
+            lexopt::Arg::Short('h') | lexopt::Arg::Long("help") => {
+                println!("{USAGE}");
+                std::process::exit(0);
+            }
+            _ => return Err(arg.unexpected()),
         }
+    }
+
+    Ok(args)
+}
+
+fn load_deviation_modules(yang_ctx: &mut Context, modules: &[String]) {
+    for module_name in modules.iter().rev() {
+        yang::load_deviations(yang_ctx, module_name);
     }
 }
 
@@ -106,12 +139,12 @@ fn count_nodes(yang_ctx: &Context) -> BTreeMap<String, NodeCounters<usize>> {
     counters
 }
 
-fn calculate_coverage(mut yang_ctx: Context, matches: &clap::ArgMatches<'_>) {
+fn calculate_coverage(mut yang_ctx: Context, modules: &[String]) {
     // Calculate node totals before applying deviations.
     let pre_dev = count_nodes(&yang_ctx);
 
     // Load YANG deviation modules.
-    load_deviation_modules(&mut yang_ctx, matches);
+    load_deviation_modules(&mut yang_ctx, modules);
 
     // Calculate node totals after applying deviations.
     let post_dev = count_nodes(&yang_ctx);
@@ -151,7 +184,7 @@ fn calculate_coverage(mut yang_ctx: Context, matches: &clap::ArgMatches<'_>) {
 
 fn generate_tree_diff(
     mut yang_ctx: Context,
-    matches: &clap::ArgMatches<'_>,
+    modules: &[String],
     module_name: &str,
 ) {
     // TODO: check if this is still necessary.
@@ -166,7 +199,7 @@ fn generate_tree_diff(
         .expect("Failed to print module");
 
     // Load YANG deviation modules.
-    load_deviation_modules(&mut yang_ctx, matches);
+    load_deviation_modules(&mut yang_ctx, modules);
 
     // Print schema tree after applying deviations.
     let module = yang_ctx
@@ -192,36 +225,22 @@ fn generate_tree_diff(
 
 fn main() {
     // Parse command-line parameters.
-    let matches = App::new("YANG coverage calculator")
-        .arg(
-            Arg::with_name("diff")
-                .long("diff")
-                .value_name("MODULE_NAME")
-                .help("Generate a YANG tree diff"),
-        )
-        .arg(
-            Arg::with_name("module")
-                .short("m")
-                .long("module")
-                .value_name("MODULE_NAME")
-                .help("YANG module name")
-                .multiple(true),
-        )
-        .get_matches();
+    let args = parse_args().unwrap_or_else(|error| {
+        eprintln!("{error}\n\n{USAGE}");
+        std::process::exit(1);
+    });
 
     // Initialize YANG context.
     let mut yang_ctx = yang::new_context();
 
     // Load YANG modules.
-    if let Some(modules) = matches.values_of("module") {
-        for module_name in modules {
-            yang::load_module(&mut yang_ctx, module_name);
-        }
+    for module_name in &args.modules {
+        yang::load_module(&mut yang_ctx, module_name);
     }
 
-    if let Some(module_name) = matches.value_of("diff") {
-        generate_tree_diff(yang_ctx, &matches, module_name);
+    if let Some(module_name) = &args.diff {
+        generate_tree_diff(yang_ctx, &args.modules, module_name);
     } else {
-        calculate_coverage(yang_ctx, &matches);
+        calculate_coverage(yang_ctx, &args.modules);
     }
 }

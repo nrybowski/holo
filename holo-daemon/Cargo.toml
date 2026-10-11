@@ -17,10 +17,10 @@ tracing-journald = "0.3"
 
 capctl.workspace = true
 chrono.workspace = true
-clap.workspace = true
 derive-new.workspace = true
 futures.workspace = true
 itertools.workspace = true
+lexopt.workspace = true
 nix.workspace = true
 pickledb.workspace = true
 prost.workspace = true

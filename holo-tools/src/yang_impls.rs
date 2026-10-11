@@ -4,13 +4,62 @@
 // SPDX-License-Identifier: MIT
 //
 
-use clap::{App, Arg};
 use convert_case::Case;
 use holo_northbound::yang_codegen::SchemaNodeCodegenExt;
 use holo_northbound::yang_codegen::struct_builder::StructBuilder;
 use holo_yang as yang;
 use yang5::context::{Context, ContextFlags};
 use yang5::schema::{SchemaModule, SchemaNodeKind};
+
+#[derive(Debug)]
+struct Args {
+    modules: Vec<String>,
+    impl_type: String,
+}
+
+// Usage summary printed by --help and on command-line errors.
+const USAGE: &str = "\
+Usage: yang_impls --module <MODULE>... --type <TYPE>
+
+Parses a YANG module and generate all required northbound callbacks for its
+nodes.
+
+Options:
+      --module <MODULE>  YANG module name
+      --type <TYPE>      Type (state/rpc)
+  -h, --help             Print this help message and exit";
+
+fn parse_args() -> Result<Args, lexopt::Error> {
+    let mut modules = vec![];
+    let mut impl_type = None;
+    let mut parser = lexopt::Parser::from_env();
+    while let Some(arg) = parser.next()? {
+        match arg {
+            lexopt::Arg::Long("module") => {
+                for value in parser.values()? {
+                    modules.push(value.into_string()?);
+                }
+            }
+            lexopt::Arg::Long("type") => {
+                impl_type = Some(parser.value()?.into_string()?);
+            }
+            lexopt::Arg::Short('h') | lexopt::Arg::Long("help") => {
+                println!("{USAGE}");
+                std::process::exit(0);
+            }
+            _ => return Err(arg.unexpected()),
+        }
+    }
+
+    if modules.is_empty() {
+        return Err("missing option '--module'".into());
+    }
+
+    Ok(Args {
+        modules,
+        impl_type: impl_type.ok_or("missing option '--type'")?,
+    })
+}
 
 fn gen_impl_blocks_rpc(yang_ctx: &Context, modules: Vec<SchemaModule<'_>>) {
     let indent1 = " ".repeat(4);
@@ -155,51 +204,32 @@ fn gen_impl_blocks_state(yang_ctx: &Context, modules: Vec<SchemaModule<'_>>) {
 
 fn main() {
     // Parse command-line parameters.
-    let matches = App::new("Generate YANG deviations")
-        .about(
-            "Parses a YANG module and generate all required northbound \
-             callbacks for its nodes",
-        )
-        .arg(
-            Arg::with_name("MODULE")
-                .long("module")
-                .help("YANG module name")
-                .value_name("MODULE")
-                .multiple(true)
-                .required(true),
-        )
-        .arg(
-            Arg::with_name("TYPE")
-                .long("type")
-                .help("Type (state/rpc)")
-                .value_name("TYPE")
-                .required(true),
-        )
-        .get_matches();
-
-    let module_names = matches.values_of("MODULE").unwrap().collect::<Vec<_>>();
-    let impl_type = matches.value_of("TYPE").unwrap();
+    let args = parse_args().unwrap_or_else(|error| {
+        eprintln!("{error}\n\n{USAGE}");
+        std::process::exit(1);
+    });
 
     // Initialize context.
     let mut yang_ctx = yang::new_context();
     yang_ctx.set_options(ContextFlags::ALL_IMPLEMENTED).unwrap();
 
     // Load provided YANG module.
-    for module_name in &module_names {
+    for module_name in &args.modules {
         yang::load_module(&mut yang_ctx, module_name);
         yang::load_deviations(&mut yang_ctx, module_name);
     }
 
     // Generate impl blocks.
-    let modules = module_names
-        .into_iter()
+    let modules = args
+        .modules
+        .iter()
         .map(|module_name| {
             yang_ctx
                 .get_module_latest(module_name)
                 .expect("Failed to find loaded module")
         })
         .collect::<Vec<_>>();
-    match impl_type {
+    match args.impl_type.as_str() {
         "rpc" => gen_impl_blocks_rpc(&yang_ctx, modules),
         "state" => gen_impl_blocks_state(&yang_ctx, modules),
         _ => panic!("Unknown type (valid options: rpc, state)"),

@@ -41,7 +41,6 @@ bitflags = { version = "2.13", features = ["serde"] }
 bytes = { version = "1.12", features = ["serde"] }
 capctl = "0.2"
 check_keyword = "0.4"
-clap = "2.33"
 chrono = { version = "0.4", features = ["serde"] }
 const-addrs = { version = "0.2", features = ["ipnet"] }
 convert_case = "0.12"
@@ -56,6 +55,7 @@ hmac = "0.13"
 internet-checksum = "0.2"
 ipnetwork = { version = "0.21", features = ["serde"] }
 itertools = "0.15"
+lexopt = "0.3"
 libc = "0.2"
 maplit = "1.0"
 md-5 = "0.11"
