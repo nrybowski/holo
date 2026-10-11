@@ -132,8 +132,20 @@ impl Config {
         let config_file = config_file.unwrap_or(Config::DFLT_FILEPATH);
 
         let config = match std::fs::read_to_string(config_file) {
-            Ok(config_str) => toml::from_str(&config_str)
-                .expect("Failed to parse configuration file"),
+            Ok(config_str) => {
+                toml::from_str(&config_str).unwrap_or_else(|error| {
+                    // Prefix the error with its line in the file, when known.
+                    let line = error
+                        .span()
+                        .and_then(|span| config_str.get(..span.start))
+                        .map(|before| {
+                            format!(":{}", before.matches('\n').count() + 1)
+                        })
+                        .unwrap_or_default();
+                    eprintln!("{config_file}{line}: {}", error.message());
+                    std::process::exit(1);
+                })
+            }
             Err(err) => {
                 eprintln!("Failed to load configuration file: {err}");
                 eprintln!("Falling back to default configuration...");
