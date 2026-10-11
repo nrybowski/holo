@@ -305,15 +305,16 @@ fn main() {
     // Files created from here on are readable by @user and @group only.
     umask(Mode::from_bits_truncate(0o027));
 
-    // Ensure only one holod instance runs.
-    let _lock =
-        ensure_single_instance(&config.state_path(Config::INSTANCE_LOCK_NAME));
-
     // Drop privileges.
     if let Err(error) = privdrop(&config.user, &config.group) {
         eprintln!("failed to drop root privileges: {error}");
         std::process::exit(1);
     }
+
+    // Ensure only one holod instance uses the state directory. This comes
+    // after the privilege drop, as @user can write to that directory.
+    let _lock =
+        ensure_single_instance(&config.state_path(Config::INSTANCE_LOCK_NAME));
 
     // Initialize tracing.
     init_tracing(&config.logging);
