@@ -51,11 +51,20 @@ Copy the `holod` and `holo-cli` binaries from the `target/release` directories t
 
 Alternatively, you can use `cargo install` to install these binaries into the `$HOME/.cargo/bin` directory.
 
+The `holod(8)` and `holod.toml(5)` man pages are in the `holo-daemon/man` directory.
+To install them, run the following from the `holo` directory:
+
+```sh
+# install -D -m 0644 holo-daemon/man/holod.8 /usr/local/share/man/man8/holod.8
+# install -D -m 0644 holo-daemon/man/holod.toml.5 /usr/local/share/man/man5/holod.toml.5
+```
+
 ## Configuration
 
 `holod` configuration consists of the following:
 * `/etc/holod.toml`: static configuration that can't change once the daemon starts. It's meant to configure which features are enabled, northbound server parameters, among other things.
   Here's an [example](holo-daemon/holod.toml) containing the default values. If this file doesn't exist, the default values will be used.
+  Every option is described in the `holod.toml(5)` man page.
 * Running configuration: this is the normal YANG-modeled
 configuration that can only be changed through a northbound client
 (e.g. [gRPC](https://github.com/holo-routing/holo/wiki/gRPC),
@@ -69,7 +78,7 @@ Access to the socket is granted by its file permissions, and no password is requ
 
 When a server listens on a TCP address, clients must authenticate as a user configured under `/ietf-system:system/authentication/user`, providing its name and password with every request.
 Both servers require TLS on a TCP address, since those credentials would otherwise be transmitted in clear text.
-For labs and testing, a server's `insecure` option serves its TCP addresses without TLS or authentication instead, giving anyone who can reach them full administrative access.
+For labs and testing, a server's `insecure` option serves its TCP addresses without TLS or authentication instead, giving anyone who can reach them full administrative access (see `holod.toml(5)`).
 The remainder of this section describes how to provision the required certificate and key.
 
 Create a certificate authority for the network:

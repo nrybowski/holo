@@ -1,0 +1,358 @@
+.\"
+.\" Copyright (c) The Holo Core Contributors
+.\"
+.\" SPDX-License-Identifier: MIT
+.\"
+.TH HOLOD.TOML 5 2026-10-10 "holo 0.9.0" "File Formats Manual"
+.SH NAME
+holod.toml \- Holo routing daemon configuration file
+.SH SYNOPSIS
+.I /etc/holod.toml
+.SH DESCRIPTION
+.I holod.toml
+holds the settings
+.BR holod (8)
+needs before it starts, such as the user and group to run as, logging
+and the northbound servers.
+Routing configuration is not kept here.
+It is managed at runtime through the northbound servers.
+.PP
+The file is written in TOML.
+.B holod
+reads it once at startup, from
+.I /etc/holod.toml
+or from the path given with the
+.B \-c
+option.
+If the file cannot be read,
+.B holod
+prints a warning and uses the defaults listed below.
+Every key is optional and defaults to the value shown, but an unknown
+key, an invalid value or a TOML syntax error aborts startup.
+.PP
+Everything except the configuration file itself is opened after
+.B holod
+switches to the configured user and group, so it must be accessible to
+them.
+.SH TOP LEVEL KEYS
+.TP
+.BR user " (string, default " """holo""" )
+User
+.B holod
+runs as after startup.
+.TP
+.BR group " (string, default " """holoadm""" )
+Group
+.B holod
+runs as after startup.
+It is the only group kept, and it owns the files
+.B holod
+creates (log files, database, gRPC Unix socket).
+Its members therefore have full administrative access to the router.
+.TP
+.BR state_dir " (string, default " """/var/opt/holo""" )
+Directory holding the following files:
+.RS
+.TP
+.B holod.lock
+Lock held while
+.B holod
+runs.
+An instance started on a directory already in use exits.
+.TP
+.B holo.db
+Database holding the configuration transaction history and the state
+protocols keep across restarts, such as the boot counts OSPF and IS\-IS
+use to protect authenticated packets against replay attacks.
+It is created on first write.
+.TP
+.B holod.sock
+gRPC Unix socket, while the gRPC server is enabled.
+.TP
+.BI holo\-events\- protocol \- instance .jsonl
+Event recordings, when the event recorder is enabled.
+.RE
+.IP
+The directory must exist and be writable by the configured user or
+group.
+.IP
+To run multiple instances of
+.B holod
+on the same Linux host, such as one per logical router, it is
+recommended to start each instance in its own mount and network
+namespaces.
+The network namespace gives the instance its own interfaces, routes and
+IP addresses, and the mount namespace gives it a private view of the
+filesystem, so its state directory and log files can stay at the
+default paths.
+.SH LOGGING
+Log messages can be sent to any combination of journald, a file and the
+standard output.
+.PP
+Fine grained control over log messages, such as protocol events or sent
+and received messages, is provided by the
+.B trace\-options
+containers of the YANG modules.
+.SS [logging.journald]
+.TP
+.BR enabled " (boolean, default " false )
+Send log messages to the systemd journal.
+Startup is aborted if the journal is not reachable.
+.SS [logging.file]
+.TP
+.BR enabled " (boolean, default " true )
+Write log messages to a file.
+.TP
+.BR dir " (string, default " """/var/log/holo""" )
+Directory holding the log files.
+It is created if missing, and must be writable by the configured user or
+group.
+.TP
+.BR name " (string, default " """holod.log""" )
+Name of the log file.
+.TP
+.BR rotation " (string, default " """never""" )
+How often a new log file is started.
+.RS
+.TP
+.B never
+Log to
+.IR dir / name ,
+appending to it across restarts.
+.TP
+.B daily
+Start a new file every day, named
+.IR name . YYYY\-MM\-DD .
+.TP
+.B hourly
+Start a new file every hour, named
+.IR name . YYYY\-MM\-DD\-HH .
+.RE
+.IP
+Dates are in UTC.
+Old files are not removed.
+.PP
+The
+.BR style ,
+.BR colors ,
+.B show_thread_id
+and
+.B show_source
+keys described under
+.B Message format
+also apply to this table.
+.SS [logging.stdout]
+.TP
+.BR enabled " (boolean, default " false )
+Write log messages to the standard output.
+.PP
+The
+.BR style ,
+.BR colors ,
+.B show_thread_id
+and
+.B show_source
+keys described under
+.B Message format
+also apply to this table.
+.SS Message format
+The following keys are accepted in both
+.B [logging.file]
+and
+.BR [logging.stdout] .
+.TP
+.BR style " (string, default " """full""" )
+Format of each message.
+.RS
+.TP
+.B full
+Single line with the timestamp, level, enclosing spans and fields.
+.TP
+.B compact
+Shorter single line: span names are kept, but their fields are appended
+after the message fields.
+.TP
+.B pretty
+Multiple lines per message, meant for reading on a terminal.
+.TP
+.B json
+One JSON object per line, meant for log processing tools.
+.RE
+.TP
+.BR colors " (boolean, default " false )
+Use ANSI escape sequences to color the output.
+.TP
+.BR show_thread_id " (boolean, default " false )
+Include the ID of the thread that emitted the message.
+.TP
+.BR show_source " (boolean, default " false )
+Include the source file and line number that emitted the message.
+.SH EVENT RECORDER
+.SS [event_recorder]
+The event recorder writes every event processed by each protocol
+instance to a file in the state directory, one JSON object per line.
+Each protocol instance writes to
+.BI holo\-events\- protocol \- instance .jsonl\fR,
+which is truncated when the instance starts.
+The recordings help developers analyze bug reports.
+They are not rotated and grow with every event.
+.TP
+.BR enabled " (boolean, default " false )
+Enable the event recorder.
+.SH NORTHBOUND SERVERS
+The northbound servers are used to configure and monitor
+.BR holod .
+.SS [northbound.grpc]
+Holo's native gRPC northbound API, used by
+.BR holo\-cli .
+It is always served on the
+.B holod.sock
+Unix socket in the state directory, and optionally on TCP addresses.
+.PP
+A socket left behind by a previous run is removed, and the new socket is
+created with mode 0660, owned by the configured user and group.
+Access to it is controlled by the file permissions alone and no password
+is requested.
+.TP
+.BR enabled " (boolean, default " true )
+Enable the gRPC server.
+.TP
+.BR address " (array of strings, default " [] )
+TCP addresses to listen on, in addition to the Unix socket.
+See
+.B TCP addresses
+below.
+.TP
+.BR insecure " (boolean, default " false )
+Serve the TCP addresses without TLS or authentication.
+See
+.B Insecure mode
+below.
+.SS [northbound.grpc.tls]
+.TP
+.BR certificate " (string, default " """/etc/holo/holo.pem""" )
+PEM file with the server certificate presented on TCP addresses.
+.TP
+.BR key " (string, default " """/etc/holo/holo.key""" )
+PEM file with the private key of the certificate.
+.PP
+When this table is present, both keys must be given.
+The files are only read when a TCP address is configured and insecure
+mode is off.
+.SS [northbound.gnmi]
+The OpenConfig gNMI service.
+.TP
+.BR enabled " (boolean, default " false )
+Enable the gNMI server.
+.TP
+.BR address " (array of strings, default " "[""0.0.0.0:9339""]" )
+TCP addresses to listen on.
+See
+.B TCP addresses
+below.
+.TP
+.BR insecure " (boolean, default " false )
+Serve the TCP addresses without TLS or authentication.
+See
+.B Insecure mode
+below.
+.SS [northbound.gnmi.tls]
+Accepts the same keys, with the same defaults, as
+.BR [northbound.grpc.tls] .
+.SS TCP addresses
+Each server listens on every address in its
+.B address
+array.
+An address is a numeric IP address and port, such as
+.B 192.0.2.1:9339
+or
+.BR [::]:9339 .
+Host names are not accepted.
+.PP
+TLS is required, using the certificate and key from the server's
+.B tls
+table.
+Clients must send the
+.B username
+and
+.B password
+metadata keys with every request, and are authenticated against the
+users configured under
+.IR /ietf\-system:system/authentication/user .
+Both requirements are lifted in insecure mode.
+.PP
+.B holod
+exits if the TLS files cannot be read, or if the Unix socket or an
+address cannot be bound.
+.SS Insecure mode
+Setting
+.B insecure
+makes a server accept plaintext connections on its TCP addresses
+without authenticating the clients, so neither a certificate nor a user
+needs to be configured.
+It is meant for labs and testing, as anyone who can reach the addresses
+gets full administrative access to the router.
+Clients must connect without TLS, such as with the
+.B \-\-insecure
+option of
+.BR gnmic .
+.PP
+Requests are attributed to
+.BI unknown@ address\fR,
+where
+.I address
+is the client's IP address.
+The Unix socket of the gRPC server is not affected.
+.B holod
+logs a warning for each address served in insecure mode.
+.SH EXAMPLES
+A configuration that logs to the journal instead of a file, and accepts
+gNMI connections over TCP in addition to the local gRPC socket:
+.PP
+.RS 4
+.EX
+[logging.journald]
+enabled = true
+.sp
+[logging.file]
+enabled = false
+.sp
+[northbound.gnmi]
+enabled = true
+address = ["[::]:9339"]
+.sp
+[northbound.gnmi.tls]
+certificate = "/etc/holo/holo.pem"
+key = "/etc/holo/holo.key"
+.EE
+.RE
+.PP
+The certificate and key must be readable by the
+.B holo
+user:
+.PP
+.RS 4
+.EX
+# mkdir /etc/holo
+# install \-o holo \-m 0400 holo.key /etc/holo/holo.key
+# install \-m 0444 holo.pem /etc/holo/holo.pem
+.EE
+.RE
+.PP
+A lab setup serving gNMI over TCP without TLS or authentication:
+.PP
+.RS 4
+.EX
+[northbound.gnmi]
+enabled = true
+insecure = true
+.EE
+.RE
+.SH FILES
+.TP
+.I /etc/holod.toml
+Default location of this file.
+.SH SEE ALSO
+.BR holod (8)
+.PP
+https://toml.io
