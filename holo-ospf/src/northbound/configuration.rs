@@ -161,7 +161,6 @@ pub struct RangeCfg {
 #[derive(Debug)]
 pub struct ReverseMetricCfg {
     pub receive: bool,
-    pub mtid: u8,
     pub metric: Option<u16>,
     pub higher: bool,
     pub offset: bool,
@@ -791,10 +790,6 @@ where
                     iface.config.reverse_metric.offset = offset;
                     event_queue.insert(Event::InterfaceSyncHelloTx(area_idx, iface_idx));
                 }
-                AreaInterfaceEntryChange::ReverseMetricMtid(mtid) => {
-                    iface.config.reverse_metric.mtid = mtid;
-                    event_queue.insert(Event::InterfaceSyncHelloTx(area_idx, iface_idx));
-                }
             }
         }
     }
@@ -1393,13 +1388,11 @@ impl Default for ReverseMetricCfg {
         let metric = None;
         let higher = ospf::areas::area::interfaces::interface::reverse_metric::flags::higher::DFLT;
         let offset = ospf::areas::area::interfaces::interface::reverse_metric::flags::offset::DFLT;
-        let mtid = ospf::areas::area::interfaces::interface::reverse_metric::mtid::DFLT;
         Self {
             receive,
             metric,
             higher,
             offset,
-            mtid,
         }
     }
 }

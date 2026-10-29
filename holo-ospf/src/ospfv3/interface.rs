@@ -81,7 +81,7 @@ impl InterfaceVersion<Self> for Ospfv3 {
                 if cfg.offset {
                     flags |= ReverseMetricFlags::O;
                 }
-                lls_data.reverse_metric.insert(cfg.mtid, (flags, metric));
+                lls_data.reverse_metric.insert(0, (flags, metric));
             }
 
             lls_data

@@ -69,14 +69,6 @@ module holo-ospf-reverse-metric {
                   "RFC 9339: OSPF Reverse Metric, Section 4.";
             }
         }
-        leaf mtid {
-            type uint8;
-            default 0;
-            description
-              "The MT-ID for the topology enabled on the link.";
-            reference
-              "RFC 9339: OSPF Reverse Metric, Section 4.";
-        }
     }
 
     augment "/rt:routing/rt:control-plane-protocols/"
@@ -84,7 +76,7 @@ module holo-ospf-reverse-metric {
             + "ospf:ospf" {
         when "derived-from-or-self(../rt:type, 'ospf:ospf')" {
             description
-              "This augment is only valide when the routing protocol
+              "This augment is only valid when the routing protocol
                instance type is 'ospf'.";
         }
 
@@ -113,7 +105,7 @@ module holo-ospf-reverse-metric {
             + "ospf:ospf/ospf:areas/ospf:area" {
         when "derived-from-or-self(../../../rt:type, 'ospf:ospf')" {
             description
-              "This augment is only valide when the routing protocol
+              "This augment is only valid when the routing protocol
                instance type is 'ospf'.";
         }
 
@@ -122,7 +114,7 @@ module holo-ospf-reverse-metric {
 
         container reverse-metric {
             description
-              "Global reverse metric configuration.";
+              "Area reverse metric configuration.";
             leaf enable-receive {
                 type boolean;
                 default "false";
@@ -165,7 +157,6 @@ module holo-ospf-reverse-metric {
                   "RFC 9339: OSPF Reverse Metric, Section 7.";
             }
             uses reverse-metric-data;
-            must './mtid = 0';
         }
     }
 
