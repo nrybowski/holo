@@ -101,8 +101,8 @@ pub struct InterfaceState<V: Version> {
     pub tasks: InterfaceTasks<V>,
     // Dynamic value of the interface cost.
     pub cost: u16,
-    // History of known Reverse Metric received on this interface.
-    pub rms: BTreeMap<u8, (ReverseMetricFlags, u16)>,
+    // Last known Reverse Metric received on this interface.
+    pub rms: Option<(ReverseMetricFlags, u16)>,
 }
 
 #[derive(Debug)]
